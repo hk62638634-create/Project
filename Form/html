@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSU Sports Carnival Registration</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="Css.css">
+</head>X
+
+<body>
+    <div class="container">
+        <div class="slider-container">
+            <input type="radio" id="slide1" name="slider" checked>
+            <input type="radio" id="slide2" name="slider">
+
+            <div class="slides">
+                <div class="slide">
+                    <img src="https://p3-flow-imagex-download-sign.byteimg.com/tos-cn-i-a9rns2rl98/b60ae88291aa4272903c401f735b7e02.png~tplv-a9rns2rl98-24-95-exif:1080:1080.png?rcl=20251015192601CEDF23202A8B35F4497C&rk3s=8e244e95&rrcfp=8a172a1a&x-expires=1761132361&x-signature=GFgZN3LKeNm06IfPexQRpTO1y3U%3D"
+                        alt="HSU Sports Carnival">
+                    <div class="slide-overlay">
+                        <h3>HSU Sports Carnival</h3>
+                        <p>Celebrating Sportsmanship & Unity</p>
+                    </div>
+                </div>
+
+                <div class="slide">
+                    <img src="https://p26-flow-imagex-download-sign.byteimg.com/tos-cn-i-a9rns2rl98/027cb6a0ac2b432a977fa4dfb16c7115.png~tplv-a9rns2rl98-24:720:720.png?rcl=2025101519341267C85BEA685D07C70B97&rk3s=8e244e95&rrcfp=8a172a1a&x-expires=1761132853&x-signature=mLYgEKp0FsCbmjaT6d%2FExnasTpA%3D"
+                        alt="Fun & Friendship">
+                    <div class="slide-overlay">
+                        <h3>Fun & Friendship</h3>
+                        <p>Build connections and create memories</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slider-nav">
+                <label for="slide1"><span class="slider-dot"></span></label>
+                <label for="slide2"><span class="slider-dot"></span></label>
+            </div>
+        </div>
+
+        <div class="intro-section">
+            <h1>HSU Sports Carnival</h1>
+            <p>Embrace the National Games spirit! The HSU Sports Carnival is a celebration of health, friendship, and unity. Sign up now to participate in exciting games, meet new friends, and show your team spirit!</p>
+
+            <div class="activity-icons">
+                <div class="activity">
+                    <i class="fas fa-running"></i>
+                    <span>Fun Run</span>
+                </div>
+                <div class="activity">
+                    <i class="fas fa-users"></i>
+                    <span>Team Building</span>
+                </div>
+                <div class="activity">
+                    <i class="fas fa-trophy"></i>
+                    <span>Friendly Competition</span>
+                </div>
+                <div class="activity">
+                    <i class="fas fa-music"></i>
+                    <span>Music & Food</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="form-container">
+                <div class="form-card">
+                    <div class="form-header">
+                        <i class="fas fa-medal"></i>
+                        <h2>Registration Form</h2>
+                        <i class="fas fa-trophy"></i>
+                    </div>
+
+                    <form id="registrationForm">
+                        <div class="form-group">
+                            <label for="studentId" class="required">Student ID</label>
+                            <input type="text" id="studentId" required placeholder="e.g., s123456">
+                            <span class="field-hint">Start with 's' followed by 6 digits (e.g., s987654)</span>
+                        </div>
+
+
+                        <div class="form-group">
+                            <label for="password" class="required">Password</label>
+                            <input type="password" id="password" required placeholder="Create your secure password">
+                            <ul class="password-requirements">
+                                <li>• More than 8 characters</li>
+                                <li>• At least one non-number character (letter or symbol)</li>
+                            </ul>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="confirmPassword" class="required">Confirm Password</label>
+                            <input type="password" id="confirmPassword" required placeholder="Re-enter your password">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dob">Date of Birth</label>
+                            <div class="datepicker-wrapper">
+                                <input type="date" id="dob">
+                                <i class="fas fa-calendar calendar-icon"></i>
+                            </div>
+                            <span class="field-hint">Optional field - Click to select your date of birth</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="programme" class="required">Programme</label>
+                            <select id="programme" required>
+                                <option value="">Select your academic programme</option>
+                                <option value="BBA">Bachelor of Business Administration (BBA)</option>
+                                <option value="BA">Bachelor of Arts (BA)</option>
+                                <option value="BSc">Bachelor of Science (BSc)</option>
+                                <option value="BEng">Bachelor of Engineering (BEng)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="required">Academic Year</label>
+                            <div class="radio-group">
+                                <div class="radio-option">
+                                    <input type="radio" id="year1" name="year" value="1" required>
+                                    <label for="year1">Year 1</label>
+                                </div>
+                                <div class="radio-option">
+                                    <input type="radio" id="year2" name="year" value="2">
+                                    <label for="year2">Year 2</label>
+                                </div>
+                                <div class="radio-option">
+                                    <input type="radio" id="year3" name="year" value="3">
+                                    <label for="year3">Year 3</label>
+                                </div>
+                                <div class="radio-option">
+                                    <input type="radio" id="year4" name="year" value="4">
+                                    <label for="year4">Year 4</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>How did you hear about the Carnival?</label>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="website" name="source" value="website">
+                                <label for="website">HSU official website</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="friends" name="source" value="friends">
+                                <label for="friends">Friends or classmates</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="teachers" name="source" value="teachers">
+                                <label for="teachers">Teachers or staff</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="others" name="source" value="others">
+                                <label for="others">Other channels</label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="submit-btn">Register for HSU Carnival</button>
+
+                        <div class="privacy-notice">
+                            <p>Your information is safe with us. We will only use it for carnival registration purposes.
+                            </p>
+                        </div>
+
+                        <div class="form-footer">
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
