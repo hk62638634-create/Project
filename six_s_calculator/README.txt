@@ -1,3 +1,4 @@
+# About_me : Cathy Wong   
 # 6S Audit Calculator
 
 ## Overview
@@ -35,3 +36,4 @@ Reach out via [LinkedIn](https://www.linkedin.com/in/cathy-wong-711731334) or [G
 
 ---
 *Last Updated: November 2025*
+
