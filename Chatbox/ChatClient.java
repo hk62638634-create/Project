@@ -179,7 +179,7 @@ public class ChatClient {
 
         new Thread(() -> {
             try {
-                socket = new Socket("10.244.0.199", 10026);
+                //Server code : socket = new Socket(xxx.xx.xx.xx);
                 writer = new PrintWriter(socket.getOutputStream(), true);
 
                 // Get username with validation
@@ -434,4 +434,5 @@ public class ChatClient {
                            color.getGreen(), 
                            color.getBlue());
     }
+
 }
