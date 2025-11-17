@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class ChatServer {
-    private static final int PORT = 10026;
+    //Server code : private static final int PORT = xxxxx;
     private static Set<ClientHandler> clients = ConcurrentHashMap.newKeySet();
 
     public static void main(String[] args) {
@@ -107,3 +107,4 @@ class ClientHandler implements Runnable {
         ChatServer.removeClient(this, username);
     }
 }
+
