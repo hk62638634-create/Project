@@ -26,8 +26,3 @@ A modern, responsive web application for registering participants in a sports ca
 - A text editor (e.g., VS Code) for modifying files.
 - [Font Awesome](https://fontawesome.com/) CDN for icons (included via CDN in HTML).
 
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/sports-carnival-registration.git
