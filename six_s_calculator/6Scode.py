@@ -1,0 +1,1115 @@
+import pandas as pd
+import tkinter as tk
+from tkinter import filedialog, ttk, messagebox
+import os
+import signal
+from docx import Document
+from docx.shared import Cm, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.table import _Cell
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+import datetime
+from typing import Dict, List, Tuple, Optional, Any
+import time
+class SixSCalculator:
+    """6S Assessment Calculator with GUI interface for non-coders"""
+    def __init__(self, root: tk.Tk):
+        self.root = root
+        self.root.title("6S 計算器")
+        self.root.geometry("1200x800")
+        self.root.minsize(1024, 768)
+        
+        # Configure styles
+        self.style = ttk.Style()
+        self.style.configure("TButton", font=('SimHei', 10))
+        self.style.configure("TLabel", font=('SimHei', 10))
+        self.style.configure("Treeview", font=('SimHei', 9), rowheight=25)
+        self.style.configure("Treeview.Heading", font=('SimHei', 10, 'bold'))
+        signal.signal(signal.SIGINT, self._handle_interrupt)
+        self.file_path = tk.StringVar()
+        self.results = self._create_empty_results()
+        self.excel_columns_count = 0
+        self.auditor_info: List[str] = []
+        # Initialize with loading message
+        self.status_var = tk.StringVar(value="初始化中...")
+        self._create_status_bar()
+        # 硬编码配置信息
+        self._setup_hardcoded_config()
+        
+        # Setup UI
+        self._setup_ui()
+        self.status_var.set("就緒")
+    def _create_status_bar(self) -> None:
+        """Create a status bar at the bottom of the window"""
+        status_frame = tk.Frame(self.root, bd=1, relief=tk.SUNKEN)
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        status_label = tk.Label(status_frame, textvariable=self.status_var, 
+                              bd=0, anchor=tk.W, font=('SimHei', 9))
+        status_label.pack(side=tk.LEFT, padx=5, pady=2)
+    def _create_empty_results(self) -> Dict[str, Any]:
+        """Create an empty results structure"""
+        return {
+            "summary": {},
+            "details": {1: {}, 2: {}, 3: {}},
+            "other": {1: [], 2: [], 3: []},  # 1:AT列, 2:CG列, 3:DT列
+            "improvements": {1: [], 2: [], 3: []}
+        }
+    def _setup_hardcoded_config(self) -> None:
+        """设置硬编码的配置信息"""
+        # 类别配置
+        self.categories = {
+            "整理 (SEIRI)": {
+                "description": "適當管理以下用品，並清除不必要的",
+                "questions": ["設備", "工具", "傢俬", "物料", "文件"]
+            },
+            "整頓 (SEITON)": {
+                "description": "有明確標識，並存放在指定區域",
+                "questions": [
+                    "設備及機器", "工具", "傢俬", "個人防護設備",
+                    "檔案資料", "容器、製品、盒子，桶等", "區域/過道(地板標記)"
+                ]
+            },
+            "清掃 (SEISO)": {
+                "description": "清除垃圾，美化環境",
+                "questions": [
+                    "所有工具是否保持清潔且整齊無損壞風險？",
+                    "機器、工作台、櫥櫃、配電箱等設備是否清潔且油漆完好？",
+                    "地面是否無灰塵、碎屑、油污、零件、五金件或空箱等雜物？",
+                    "牆壁、隔間是否清潔且油漆完好無破損？",
+                    "檔案資料是否完整無破損，並保持清潔防塵？",
+                    "容器、箱子、桶等是否乾淨無損壞，並整齊堆放在指定位置？",
+                    "個人防護裝備是否定期清潔消毒，且易於取用和貼有標籤？",
+                    "清潔用具是否整齊存放且易於取用？",
+                    "警告標誌、標籤、地標線是否清潔可見且無損壞？",
+                    "是否張貼清潔時間表，並標明清潔時間、頻率及負責人？"
+                ]
+            },
+            "安全 (SECURITY)": {
+                "description": "安全操作，以人為本",
+                "questions": [
+                    "是否按時間表檢查供應品、工具、設備並有文件記錄？",
+                    "每項個人防護裝備是否有標示？",
+                    "所有人員是否接受正確使用個人防護設備培訓和懂得定期檢查？",
+                    "所有設備是否有安全操作指引，並為故障設備做標記、移除或送修？",
+                    "危險物品是否專區存放並標示？",
+                    "物品存放在高度標準下？",
+                    "緊急出口路線是否明顯標示並保持暢通？",
+                    "張貼物是否牢固固定？"
+                ]
+            },
+            "素養 (SHITSUKE)": {
+                "description": "形成制度，養成習慣",
+                "questions": [
+                    "員工是否自發執行及參加6S活動？",
+                    "上次審核結果是否在明顯處展示？",
+                    "上次審核發現的改善項目是否已完成？",
+                    "長期電腦操作者的工作站是否符合人體工學標準？"
+                ]
+            },
+            "清潔 (SEIKETSU)": {
+                "description": "清潔環境，貫徹到底",
+                "questions": [
+                    "是否定期執行6S審核，並使用標準化的評分表記錄結果？",
+                    "所有員工是否接受過相同的6S標準培訓？",
+                    "6S管理看板是否保持更新並定期審查？",
+                    "每個區域的6S維護責任是否明確分配，並通過看板/文件公示？"
+                ]
+            },
+            "其他": {
+                "description": "其他相關意見或說明",
+                "questions": []
+            }
+        }
+        
+        # 地点配置
+        self.locations = {
+            1: "12/F Lab",
+            2: "13/F Lab",
+            3: "20/F Lab"
+        }
+        
+        # 地点列配置 - 明确各组对应的"其他"数据列
+        self.location_configs = {
+            1: {
+                "整理 (SEIRI)": (7, 12),  # H-L (0-based索引7到11)
+                "整頓 (SEITON)": (12, 19),  # M-S
+                "清掃 (SEISO)": (19, 29),  # T-AC
+                "安全 (SECURITY)": (29, 37),  # AD-AK
+                "素養 (SHITSUKE)": (37, 41),  # AL-AO
+                "清潔 (SEIKETSU)": (41, 45),  # AP-AS
+                "other_col": "AT"  # 组1对应AT列
+            },
+            2: {
+                "整理 (SEIRI)": (46, 51),  # AU-AY
+                "整頓 (SEITON)": (51, 58),  # AZ-BF
+                "清掃 (SEISO)": (58, 68),  # BG-BP
+                "安全 (SECURITY)": (68, 76),  # BQ-BX
+                "素養 (SHITSUKE)": (76, 80),  # BY-CB
+                "清潔 (SEIKETSU)": (80, 84),  # CC-CF
+                "other_col": "CG"  # 组2对应CG列
+            },
+            3: {
+                "整理 (SEIRI)": (85, 90), # CH-CL (原 86,91 调整为 85,90)
+                "整頓 (SEITON)": (90, 97), # CM-CS (原 91,98 调整为 90,97)      
+                "清掃 (SEISO)": (97, 107), # CT-DC (原 98,108 调整为 97,107)
+                "安全 (SECURITY)": (107, 115), # DD-DK (原 108,116 调整为 107,115)
+                "素養 (SHITSUKE)": (115, 119), # DL-DO (原 116,120 调整为 115,119)
+                "清潔 (SEIKETSU)": (119, 123), # DP-DS (根据要求设置)
+                "other_col": "DT" # 组 3 对应 DT 列
+            }
+        }
+        
+        # 地点列映射（Excel列名）
+        self.location_col_maps = {
+            1: {
+                "整理 (SEIRI)": ["H", "I", "J", "K", "L"],
+                "整頓 (SEITON)": ["M", "N", "O", "P", "Q", "R", "S"],
+                "清掃 (SEISO)": ["T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC"],
+                "安全 (SECURITY)": ["AD", "AE", "AF", "AG", "AH", "AI", "AJ", "AK"],
+                "素養 (SHITSUKE)": ["AL", "AM", "AN", "AO"],
+                "清潔 (SEIKETSU)": ["AP", "AQ", "AR", "AS"]
+            },
+            2: {
+                "整理 (SEIRI)": ["AU", "AV", "AW", "AX", "AY"],
+                "整頓 (SEITON)": ["AZ", "BA", "BB", "BC", "BD", "BE", "BF"],
+                "清掃 (SEISO)": ["BG", "BH", "BI", "BJ", "BK", "BL", "BM", "BN", "BO", "BP"],
+                "安全 (SECURITY)": ["BQ", "BR", "BS", "BT", "BU", "BV", "BW", "BX"],
+                "素養 (SHITSUKE)": ["BY", "BZ", "CA", "CB"],
+                "清潔 (SEIKETSU)": ["CC", "CD", "CE", "CF"]
+            },
+            3: {
+                "整理 (SEIRI)": ["CH", "CI", "CJ", "CK", "CL"],
+                "整頓 (SEITON)": ["CM", "CN", "CO", "CP", "CQ", "CR", "CS"],
+                "清掃 (SEISO)": ["CT", "CU", "CV", "CW", "CX", "CY", "CZ", "DA", "DB", "DC"],
+                "安全 (SECURITY)": ["DD", "DE", "DF", "DG", "DH", "DI", "DJ", "DK"],
+                "素養 (SHITSUKE)": ["DL", "DM", "DN", "DO"],
+                "清潔 (SEIKETSU)": ["DP", "DQ", "DR", "DS"]
+            }
+        }
+    def _setup_ui(self) -> None:
+        """Setup main UI components"""
+        # Create file selector
+        self._create_file_selector()
+        
+        # Create action buttons
+        self._create_action_buttons()
+        
+        # Create results frame
+        self.results_frame = ttk.Frame(self.root)
+        self.results_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        self._create_results_display(self.results_frame)
+    def _create_file_selector(self) -> None:
+        """Create file selection UI elements"""
+        file_frame = tk.Frame(self.root, padx=10, pady=10, relief=tk.RAISED, bd=1)
+        file_frame.pack(fill=tk.X)
+        
+        tk.Label(file_frame, text="選擇 Excel 檔案:", font=('SimHei', 10, 'bold')).pack(side=tk.LEFT, padx=5)
+        file_entry = tk.Entry(file_frame, textvariable=self.file_path, width=60, font=('SimHei', 10))
+        file_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        browse_btn = tk.Button(file_frame, text="瀏覽", command=self._browse_file, bg="#e1f5fe", relief=tk.RAISED)
+        browse_btn.pack(side=tk.LEFT, padx=5)
+    def _create_action_buttons(self) -> None:
+        """Create main action buttons"""
+        btn_frame = tk.Frame(self.root, padx=10, pady=5)
+        btn_frame.pack(fill=tk.X)
+        
+        calc_btn = tk.Button(btn_frame, text="計算 6S 總分", command=self.calculate_scores, 
+                           width=20, bg="#e8f5e9", relief=tk.RAISED)
+        calc_btn.pack(side=tk.LEFT, padx=10)
+        
+        export_btn = tk.Button(btn_frame, text="匯出 Word 報告", command=self.export_all_to_single_doc, 
+                            width=20, bg="#fff3e0", relief=tk.RAISED)
+        export_btn.pack(side=tk.LEFT, padx=10)
+    def _create_results_display(self, parent_frame) -> None:
+        """Create results display UI"""
+        results_frame = parent_frame
+        
+        # Auditor information section
+        auditor_frame = tk.Frame(results_frame, relief=tk.RAISED, bd=1, padx=5, pady=5)
+        auditor_frame.pack(fill=tk.X, pady=(0, 10))
+        tk.Label(auditor_frame, text="審核員資訊: ", font=('SimHei', 10, 'bold')).pack(side=tk.LEFT)
+        self.auditor_label = tk.Label(auditor_frame, text="尚未載入", fg="gray50")
+        self.auditor_label.pack(side=tk.LEFT)
+        
+        # Summary results section
+        tk.Label(results_frame, text="總分彙總 (各地點對比):", font=('SimHei', 10, 'bold')).pack(anchor=tk.W)
+        self.summary_tree = ttk.Treeview(
+            results_frame, 
+            columns=("category", "loc1_score", "loc2_score", "loc3_score"), 
+            show="headings", 
+            height=8
+        )
+        self._configure_summary_tree()
+        self.summary_tree.pack(pady=(0, 10), fill=tk.X)
+        
+        # Detailed results section
+        tk.Label(results_frame, text="詳細問題得分:", font=('SimHei', 10, 'bold')).pack(anchor=tk.W)
+        self.main_notebook = ttk.Notebook(results_frame)
+        self.main_notebook.pack(fill=tk.BOTH, expand=True)
+        self._create_detail_tabs()
+    def _configure_summary_tree(self) -> None:
+        """Configure summary results treeview"""
+        self.summary_tree.heading("category", text="類別")
+        self.summary_tree.heading("loc1_score", text=self.locations.get(1, "未知地點"))
+        self.summary_tree.heading("loc2_score", text=self.locations.get(2, "未知地點"))
+        self.summary_tree.heading("loc3_score", text=self.locations.get(3, "未知地點"))
+        
+        self.summary_tree.column("category", width=180, anchor="w")
+        self.summary_tree.column("loc1_score", width=100, anchor="center")
+        self.summary_tree.column("loc2_score", width=100, anchor="center")
+        self.summary_tree.column("loc3_score", width=100, anchor="center")
+        
+        # Add alternating row colors
+        self.summary_tree.tag_configure('oddrow', background='#ffffff')
+        self.summary_tree.tag_configure('evenrow', background='#f0f0f0')
+    def _create_detail_tabs(self) -> None:
+        """Create detail tabs for each location and category"""
+        self.detail_trees: Dict[int, Dict[str, ttk.Treeview]] = {1: {}, 2: {}, 3: {}}
+        self.other_trees: Dict[int, Optional[ttk.Treeview]] = {1: None, 2: None, 3: None}
+        
+        for loc_num in [1, 2, 3]:
+            if loc_num not in self.locations:
+                continue
+            loc_frame = ttk.Frame(self.main_notebook)
+            self.main_notebook.add(loc_frame, text=f"{self.locations[loc_num]} 數據詳情")
+            
+            cat_notebook = ttk.Notebook(loc_frame)
+            cat_notebook.pack(fill=tk.BOTH, expand=True)
+            
+            for category in self.categories:
+                self._create_category_tab(cat_notebook, loc_num, category)
+    def _create_category_tab(self, parent_notebook: ttk.Notebook, loc_num: int, category: str) -> None:
+        """Create a tab for a specific category"""
+        frame = ttk.Frame(parent_notebook)
+        parent_notebook.add(frame, text=category)
+        
+        # Category description
+        full_category_info = f"{category} - {self.categories[category]['description']}"
+        desc_label = tk.Label(
+            frame, 
+            text=full_category_info, 
+            fg="darkblue", 
+            font=('SimHei', 10, 'bold'),
+            wraplength=800, 
+        )
+        desc_label.pack(anchor=tk.W, padx=5, pady=5)
+        
+        # Create appropriate treeview based on category
+        if category == "其他":
+            # 明确显示当前组对应的"其他"数据列
+            col_name = self.location_configs[loc_num]["other_col"]
+            col_label = tk.Label(
+                frame, 
+                text=f"數據來源: Excel中的 {col_name} 列", 
+                fg="green", 
+                font=('SimHei', 9, 'italic')
+            )
+            col_label.pack(anchor=tk.W, padx=5, pady=2)
+            
+            tree = ttk.Treeview(frame, columns=("index", "content"), show="headings")
+            tree.heading("index", text="序號")
+            tree.heading("content", text="內容")
+            tree.column("index", width=60, anchor="center")
+            tree.column("content", width=720, anchor="w")
+            self.other_trees[loc_num] = tree
+        else:
+            tree = ttk.Treeview(frame, columns=("question", "score"), show="headings")
+            tree.heading("question", text="主題")
+            tree.heading("score", text="得分")
+            tree.column("question", width=550, anchor="w")
+            tree.column("score", width=70, anchor="center")
+            self.detail_trees[loc_num][category] = tree
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        tree.pack(fill=tk.BOTH, expand=True)
+        
+        # Configure row colors
+        tree.tag_configure('oddrow', background='#ffffff')
+        tree.tag_configure('evenrow', background='#f0f0f0')
+    def _browse_file(self) -> None:
+        """Browse and select Excel file"""
+        filetypes = (('Excel 檔案', '*.xlsx *.xls'), ('所有檔案', '*.*'))
+        filename = filedialog.askopenfilename(
+            title='選擇 Excel 檔案',
+            initialdir='.',
+            filetypes=filetypes
+        )
+        
+        if filename:
+            self.file_path.set(filename)
+            self._show_temp_message(f"已選擇檔案: {os.path.basename(filename)}", "green")
+    def calculate_scores(self) -> None:
+        """Calculate 6S scores from selected Excel file"""
+        # Reset results
+        self.results = self._create_empty_results()
+        self._clear_all_trees()
+        self.auditor_info = []
+        
+        # Validate file selection
+        file_path = self.file_path.get()
+        if not file_path or not os.path.exists(file_path):
+            messagebox.showerror("錯誤", "請先選擇有效的 Excel 檔案！")
+            return
+        
+        try:
+            self.status_var.set("載入 Excel 數據中...")
+            self.root.update()
+            
+            # Load Excel data
+            excel_data = self._load_excel_data(file_path)
+            if excel_data is None:
+                self.status_var.set("Excel 數據載入失敗")
+                return
+                
+            df_original, df_converted = excel_data
+            self.excel_columns_count = len(df_original.columns)
+            
+            self.status_var.set("讀取審核員資訊...")
+            self.root.update()
+            self._read_auditor_info(df_original)
+            
+            # Process each location
+            for loc_num in [1, 2, 3]:
+                if loc_num in self.location_configs:
+                    self.status_var.set(f"處理 {self.locations[loc_num]} 數據...")
+                    self.root.update()
+                    self._process_location(loc_num, df_original, df_converted)
+                    time.sleep(0.5)  # Small delay to show progress
+            
+            # Display results
+            self.status_var.set("顯示計算結果...")
+            self.root.update()
+            self._display_summary_results()
+            
+            self.status_var.set("計算完成")
+            messagebox.showinfo("完成", "計算已完成，可匯出Word報告！")
+                
+        except Exception as e:
+            self.status_var.set("計算過程出錯")
+            messagebox.showerror("錯誤", f"計算過程中發生錯誤: {str(e)}")
+    def _load_excel_data(self, file_path: str) -> Optional[Tuple[pd.DataFrame, pd.DataFrame]]:
+        """Load Excel data and return both original and converted (numeric) versions"""
+        try:
+            df_original = pd.read_excel(file_path, sheet_name=0, dtype=object, header=None)
+            df_converted = df_original.applymap(self._convert_to_numeric)
+            return (df_original, df_converted)
+            
+        except Exception as e:
+            messagebox.showerror("Excel讀取錯誤", f"無法讀取Excel檔案: {str(e)}")
+            return None
+    def _convert_to_numeric(self, value: Any) -> int:
+        """Convert Excel cell values to numeric scores (1 for pass, 0 for fail)"""
+        if pd.isna(value):
+            return 0
+            
+        value_str = str(value).strip().lower()
+        pass_values = {'1', '1.0', '√', '✓', '是', '通過', '合格', 'yes', 'pass'}
+        if value_str in pass_values:
+            return 1
+            
+        fail_values = {'0', '0.0', '×', '✗', '否', '不通過', '不合格', 'no', 'fail'}
+        if value_str in fail_values:
+            return 0
+            
+        return 0
+    def _excel_col_to_index(self, col_name: str) -> int:
+        """Convert Excel column name (A, B, C, ...) to 0-based index"""
+        if not col_name or not isinstance(col_name, str):
+            return -1
+            
+        index = 0
+        for char in col_name.upper():
+            if not char.isalpha():
+                return -1
+            index = index * 26 + (ord(char) - ord('A') + 1)
+        
+        return index - 1
+    def _process_location(self, loc_num: int, df_original: pd.DataFrame, df_converted: pd.DataFrame) -> None:
+        """Process data for a specific location"""
+        if loc_num not in self.location_configs:
+            return
+            
+        loc_config = self.location_configs[loc_num]
+        # 处理"其他"类别数据 - 直接使用配置中指定的列(AT/CG/DT)
+        self._process_other_data(loc_num, loc_config["other_col"], df_original)
+        
+        # 处理其他类别
+        for category in self.categories:
+            if category == "其他" or category not in loc_config:
+                continue
+                
+            start_col, end_col = loc_config[category]
+            self._process_category(loc_num, category, start_col, end_col, df_original, df_converted)
+    def _index_to_excel_col(self, index: int) -> str:
+        """Convert 0-based index to Excel column name (A, B, C, ...)"""
+        if index < 0:
+            return "Invalid"
+        col_name = ""
+        index += 1
+        while index > 0:
+            index, remainder = divmod(index - 1, 26)
+            col_name = chr(ord('A') + remainder) + col_name
+        return col_name
+    def _process_category(self, loc_num: int, category: str, start_col: int, end_col: int, 
+                         df_original: pd.DataFrame, df_converted: pd.DataFrame) -> None:
+        """Process data for a specific category"""
+        try:
+            defined_question_count = len(self.categories[category]["questions"])
+            
+            # Validate column range
+            if start_col < 0 or end_col <= 0:
+                self._set_category_error(loc_num, category, defined_question_count)
+                messagebox.warning("配置警告", f"{self.locations[loc_num]} 的 {category} 配置無效，請檢查欄位設置")
+                return
+                
+            if start_col >= self.excel_columns_count:
+                self._set_category_error(loc_num, category, defined_question_count)
+                messagebox.warning("數據警告", f"{self.locations[loc_num]} 的 {category} 欄位超出Excel文件範圍")
+                return
+                
+            adjusted_end = min(end_col, self.excel_columns_count)
+            if adjusted_end <= start_col:
+                self._set_category_error(loc_num, category, defined_question_count)
+                return
+                
+            # Extract relevant data
+            relevant_cols_original = df_original.iloc[:, start_col:adjusted_end]
+            relevant_cols_converted = df_converted.iloc[:, start_col:adjusted_end]
+            
+            data_rows_original = relevant_cols_original.iloc[1:]
+            data_rows_converted = relevant_cols_converted.iloc[1:]
+            
+            # Calculate scores with check for matching question count
+            col_count = adjusted_end - start_col
+            if col_count != defined_question_count:
+                messagebox.showwarning(
+                    "數據不匹配", 
+                    f"{self.locations[loc_num]} 的 {category} 問題數量({defined_question_count})與Excel欄位數量({col_count})不匹配"
+                )
+            
+            col_scores = data_rows_converted.sum().tolist()
+            col_replies = data_rows_original.notna().sum().tolist()
+            
+            # Ensure we have scores for all questions
+            if len(col_scores) < defined_question_count:
+                # Pad with zeros if there are fewer columns than questions
+                col_scores.extend([0] * (defined_question_count - len(col_scores)))
+                col_replies.extend([0] * (defined_question_count - len(col_replies)))
+            elif len(col_scores) > defined_question_count:
+                # Truncate if there are more columns than questions
+                col_scores = col_scores[:defined_question_count]
+                col_replies = col_replies[:defined_question_count]
+            
+            total_score = sum(col_scores)
+            total_replies = sum(col_replies)
+            avg_score = round(total_score / total_replies, 2) if total_replies > 0 else 0.00
+            
+            # Store results
+            self.results["summary"][category] = self.results["summary"].get(category, {})
+            self.results["summary"][category][loc_num] = {
+                "total_score": total_score,
+                "total_replies": total_replies,
+                "avg_score": avg_score,
+                "question_count": defined_question_count
+            }
+            
+            # Process and display details
+            self._process_category_details(
+                loc_num, category, 
+                relevant_cols_original, relevant_cols_converted,
+                col_scores, col_replies
+            )
+            
+        except Exception as e:
+            # Handle errors gracefully with detailed message
+            defined_question_count = len(self.categories[category]["questions"])
+            self.results["summary"][category] = self.results["summary"].get(category, {})
+            self.results["summary"][category][loc_num] = {
+                "total_score": 0,
+                "total_replies": 0,
+                "avg_score": "錯誤",
+                "question_count": defined_question_count
+            }
+            messagebox.showerror(
+                "處理錯誤", 
+                f"處理 {self.locations[loc_num]} 的 {category} 時發生錯誤: {str(e)}\n請檢查配置和Excel文件"
+            )
+    def _set_category_error(self, loc_num: int, category: str, question_count: int) -> None:
+        """Set error state for a category"""
+        self.results["summary"][category] = self.results["summary"].get(category, {})
+        self.results["summary"][category][loc_num] = {
+            "total_score": 0,
+            "total_replies": 0,
+            "avg_score": "錯誤",
+            "question_count": question_count
+        }
+    def _process_category_details(self, loc_num: int, category: str, 
+                                 original_cols: pd.DataFrame, converted_cols: pd.DataFrame, 
+                                 col_scores: List[int], col_replies: List[int]) -> None:
+        """Process and display category details"""
+        questions = self.categories[category]["questions"].copy()
+        
+        # Calculate question scores
+        question_scores = []
+        for score, replies in zip(col_scores, col_replies):
+            question_scores.append(round(score / replies, 2) if replies > 0 else 0.0)
+        
+        # Pad lists to match length
+        max_len = max(len(questions), len(col_scores), len(question_scores))
+        questions = self._pad_list(questions, max_len, "額外問題 {index}")
+        
+        # Store details
+        details = []
+        for question, score, replies in zip(questions, question_scores, col_replies):
+            details.append({
+                "question": question, 
+                "score": score,
+                "replies": replies
+            })
+        
+        self.results["details"][loc_num][category] = details
+        
+        # Display in treeview
+        if category in self.detail_trees[loc_num]:
+            tree = self.detail_trees[loc_num][category]
+            for i, (question, q_score) in enumerate(zip(questions, question_scores)):
+                tags = ['evenrow'] if i % 2 == 0 else ['oddrow']
+                tree.insert("", "end", values=[question, f"{q_score:.2f}"], tags=tags)
+    def _read_auditor_info(self, df_original: pd.DataFrame) -> None:
+        """Read auditor information from Excel"""
+        try:
+            auditor_col = 6  # Column G (0-based index 6)
+            self.auditor_info = []
+            
+            if auditor_col >= self.excel_columns_count:
+                self.auditor_label.config(text="Excel檔案中沒有G列", fg="red")
+                return
+                
+            # Extract auditor info from relevant column
+            for row_idx in range(1, len(df_original)):
+                auditor_value = df_original.iloc[row_idx, auditor_col]
+                if pd.notna(auditor_value):
+                    auditor_text = str(auditor_value).strip()
+                    if auditor_text:
+                        self.auditor_info.append(auditor_text)
+            
+            # Update display
+            if self.auditor_info:
+                self.auditor_label.config(text=", ".join(self.auditor_info), fg="black")
+            else:
+                self.auditor_label.config(text="未設定審核員資訊", fg="red")
+                
+        except Exception as e:
+            self.auditor_label.config(text=f"讀取審核員資訊錯誤: {str(e)}", fg="red")
+    def _process_other_data(self, loc_num: int, target_col: str, df_original: pd.DataFrame) -> None:
+        """
+        处理'其他'类别数据，直接使用指定的列(AT/CG/DT)
+        组1→AT列, 组2→CG列, 组3→DT列
+        不依赖任何表头，直接根据列名查找
+        """
+        try:
+            other_data = []
+            
+            # 将列名转换为索引
+            col_index = self._excel_col_to_index(target_col)
+            
+            # 验证列索引有效性
+            if col_index < 0 or col_index >= self.excel_columns_count:
+                error_msg = f"錯誤: 找不到'{target_col}'列，請檢查Excel文件"
+                other_data.append({"content": error_msg})
+                self.results["other"][loc_num] = other_data
+                # 在UI中显示错误
+                if self.other_trees[loc_num] is not None:
+                    self.other_trees[loc_num].insert("", "end", values=[1, error_msg])
+                return
+            # 提取该列的所有数据（从第二行开始，即索引1）
+            other_column_data = df_original.iloc[1:, col_index].tolist()
+            
+            # 处理每个单元格，每个非空内容作为单独条目
+            for content in other_column_data:
+                display_content = str(content).strip() if pd.notna(content) else ""
+                if display_content:  # 只添加非空内容
+                    other_data.append({"content": display_content})
+            # 如果没有数据，添加提示信息
+            if not other_data:
+                other_data.append({"content": f"'{target_col}'列中沒有記錄的信息"})
+            # 在UI表格中显示
+            if self.other_trees[loc_num] is not None:
+                for idx, item in enumerate(other_data, 1):
+                    item["index"] = idx  # 添加序号
+                    self.other_trees[loc_num].insert("", "end", values=[idx, item["content"]])
+            
+            # 存储结果
+            self.results["other"][loc_num] = other_data
+            
+        except Exception as e:
+            error_msg = f"處理'{target_col}'列時發生錯誤: {str(e)}"
+            other_data = [{"index": 1, "content": error_msg}]
+            self.results["other"][loc_num] = other_data
+            # 在UI中显示错误
+            if self.other_trees[loc_num] is not None:
+                self.other_trees[loc_num].insert("", "end", values=[1, error_msg])
+    def _display_summary_results(self) -> None:
+        """Display summary results"""
+        for category in self.categories:
+            if category == "其他" or category not in self.results["summary"]:
+                continue
+                
+            # Get scores for each location
+            loc1_data = self.results["summary"][category].get(1, {})
+            loc1_score = f"{loc1_data.get('avg_score', 0.00):.2f}" if loc1_data.get('avg_score') != "錯誤" else "錯誤"
+                
+            loc2_data = self.results["summary"][category].get(2, {})
+            loc2_score = f"{loc2_data.get('avg_score', 0.00):.2f}" if loc2_data.get('avg_score') != "錯誤" else "錯誤"
+                
+            loc3_data = self.results["summary"][category].get(3, {})
+            loc3_score = f"{loc3_data.get('avg_score', 0.00):.2f}" if loc3_data.get('avg_score') != "錯誤" else "錯誤"
+                
+            # Insert into treeview with alternating colors
+            item = self.summary_tree.insert("", "end", values=[
+                category, loc1_score, loc2_score, loc3_score
+            ])
+            
+            # Apply alternating row colors
+            if len(self.summary_tree.get_children()) % 2 == 0:
+                self.summary_tree.item(item, tags=['evenrow'])
+            else:
+                self.summary_tree.item(item, tags=['oddrow'])
+    def export_all_to_single_doc(self) -> None:
+        """Export results to a single Word document"""
+        if not self.results or not self.results["summary"]:
+            messagebox.showwarning("警告", "請先計算數據然後再匯出！")
+            return
+        
+        auditor_text = ", ".join(self.auditor_info) if self.auditor_info else "未設定"
+        
+        # Get save path
+        default_filename = f"6S 審核清單彙總_{datetime.datetime.now().strftime('%Y%m%d')}.docx"
+        save_path = filedialog.asksaveasfilename(
+            defaultextension=".docx",
+            filetypes=[("Word 檔案", "*.docx")],
+            initialfile=default_filename,
+            title="儲存所有地點的審核清單"
+        )
+        
+        if not save_path:
+            messagebox.showinfo("提示", "已取消匯出")
+            return
+        
+        try:
+            self.status_var.set("正在匯出 Word 報告...")
+            self.root.update()
+            
+            doc = Document()
+            
+            # Add content for each location
+            for loc_num in [1, 2, 3]:
+                if loc_num in self.locations:
+                    self._add_location_content(doc, loc_num, auditor_text)
+                    if loc_num < 3:
+                        doc.add_page_break()
+            
+            # Save document
+            doc.save(save_path)
+            # 匯出後自動開啟 Word 檔案（Windows）
+            os.startfile(save_path)
+            self.status_var.set("匯出完成")
+            messagebox.showinfo("完成", f"已成功匯出到:\n{save_path}")
+                
+        except Exception as e:
+            self.status_var.set("匯出失敗")
+            messagebox.showerror("匯出錯誤", f"匯出過程中發生錯誤: {str(e)}")
+    def _add_location_content(self, doc: Document, loc_num: int, auditor_text: str) -> None:
+        """Add content for a specific location to the Word document"""
+        # Location title
+        loc_title = doc.add_heading(f'{self.locations[loc_num]} 6S 審核清單', level=1)
+        loc_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        loc_title.runs[0].font.size = Pt(26)
+        
+        # Basic information section
+        self._add_basic_info_section(doc, loc_num, auditor_text)
+        
+        # Add rating criteria for first location only
+        if loc_num == 1:
+            self._add_rating_criteria(doc)
+        
+        # Summary table
+        self._add_summary_table(doc, loc_num)
+        
+        # Category details
+        self._add_categories_details(doc, loc_num)
+        
+        # Other comments section - 明确标注数据来源列
+        other_col = self.location_configs[loc_num]["other_col"]
+        other_heading = doc.add_heading(f'其他相關意見或說明 (來源: Excel {other_col} 列)', level=2)
+        self._add_other_section(doc, loc_num)
+        
+        # Improvement measures section
+        self._add_improvement_section(doc, loc_num)
+    def _add_basic_info_section(self, doc: Document, loc_num: int, auditor_text: str) -> None:
+        """Add basic information section to Word document"""
+        info_table = doc.add_table(rows=2, cols=4)
+        info_table.autofit = False
+        for i, width in enumerate([3, 3, 3, 3]):
+            info_table.columns[i].width = Cm(width)
+        
+        # Basic info data
+        info_data = [
+            ["地點:", self.locations[loc_num], "日期:", datetime.datetime.now().strftime("%Y-%m-%d")],
+            ["審核員:", auditor_text, "", ""]
+        ]
+        
+        # Populate table
+        for row_idx, row_data in enumerate(info_data):
+            for col_idx, text in enumerate(row_data):
+                cell = info_table.cell(row_idx, col_idx)
+                cell.text = text
+                self._set_cell_border(cell, top={'sz': 2}, left={'sz': 2}, bottom={'sz': 2}, right={'sz': 2})
+                if col_idx % 2 == 0:
+                    cell.paragraphs[0].runs[0].bold = True
+        
+        doc.add_paragraph()
+        
+        # Audit dates section
+        audit_dates_table = doc.add_table(rows=1, cols=3)
+        audit_dates_table.autofit = False
+        for i, width in enumerate([4, 4, 4]):
+            audit_dates_table.columns[i].width = Cm(width)
+        
+        audit_dates_data = ["上次審核日期:", "上次審核結果:", "下次審核日期:"]
+        
+        for col_idx, text in enumerate(audit_dates_data):
+            cell = audit_dates_table.cell(0, col_idx)
+            cell.text = text
+            self._set_cell_border(cell, top={'sz': 2}, left={'sz': 2}, bottom={'sz': 2}, right={'sz': 2})
+            cell.paragraphs[0].runs[0].bold = True
+        
+        doc.add_paragraph()
+    def _add_summary_table(self, doc: Document, loc_num: int) -> None:
+        """Add summary table to Word document"""
+        doc.add_heading('總分彙總', level=2)
+        
+        # Get valid categories
+        valid_categories = [cat for cat in self.categories if cat != "其他" and cat in self.results["summary"]]
+        num_categories = len(valid_categories)
+        
+        if num_categories == 0:
+            doc.add_paragraph("沒有可用的匯總數據")
+            return
+        
+        # Create summary table
+        summary_table = doc.add_table(rows=4, cols=num_categories + 1)
+        summary_table.autofit = False
+        summary_table.columns[0].width = Cm(3)
+        for i in range(1, num_categories + 1):
+            summary_table.columns[i].width = Cm(2.5)
+        
+        # Header row
+        header_row = summary_table.rows[0]
+        header_row.cells[0].text = "項目"
+        self._format_header_cell(header_row.cells[0])
+        
+        for col_idx, category in enumerate(valid_categories, start=1):
+            header_row.cells[col_idx].text = category
+            self._format_header_cell(header_row.cells[col_idx])
+        
+        # Question count row
+        question_count_row = summary_table.rows[1]
+        question_count_row.cells[0].text = "問題數量"
+        self._format_data_cell(question_count_row.cells[0], is_header=True)
+        
+        for col_idx, category in enumerate(valid_categories, start=1):
+            count = len(self.categories[category]["questions"])
+            question_count_row.cells[col_idx].text = str(count)
+            self._format_data_cell(question_count_row.cells[col_idx])
+        
+        # Average score row
+        avg_score_row = summary_table.rows[2]
+        avg_score_row.cells[0].text = "平均得分"
+        self._format_data_cell(avg_score_row.cells[0], is_header=True)
+        
+        for col_idx, category in enumerate(valid_categories, start=1):
+            data = self.results["summary"][category][loc_num]
+            avg_score = data["avg_score"]
+            avg_score_row.cells[col_idx].text = f"{avg_score:.2f}" if avg_score != "錯誤" else "錯誤"
+            self._format_data_cell(avg_score_row.cells[col_idx])
+        
+        # Total score row
+        total_score_row = summary_table.rows[3]
+        total_score_row.cells[0].text = "總分"
+        self._format_data_cell(total_score_row.cells[0], is_header=True)
+        
+        for col_idx, category in enumerate(valid_categories, start=1):
+            data = self.results["summary"][category][loc_num]
+            question_count = len(self.categories[category]["questions"])
+            avg_score = data["avg_score"]
+            
+            if avg_score != "錯誤":
+                total_score = round(avg_score * question_count, 2)
+                total_score_row.cells[col_idx].text = f"{total_score:.2f}"
+            else:
+                total_score_row.cells[col_idx].text = "錯誤"
+                
+            self._format_data_cell(total_score_row.cells[col_idx])
+        
+        doc.add_paragraph()
+    def _add_rating_criteria(self, doc: Document) -> None:
+        """Add rating criteria to Word document"""
+        doc.add_heading('評分標準', level=2)
+        criteria_table = doc.add_table(rows=2, cols=3)
+        criteria_table.columns[0].width = Cm(4)
+        criteria_table.columns[1].width = Cm(4)
+        criteria_table.columns[2].width = Cm(4)
+        
+        # Header row
+        headers = ["N/A", "0", "1"]
+        for col_idx, header in enumerate(headers):
+            cell = criteria_table.cell(0, col_idx)
+            cell.text = header
+            self._set_cell_border(cell, top={'sz': 4}, left={'sz': 4}, bottom={'sz': 4}, right={'sz': 4})
+            self._set_cell_background(cell, "000000")
+            self._set_text_color(cell, "FFFFFF")
+            cell.paragraphs[0].runs[0].bold = True
+            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Description row
+        descriptions = ["不適用", "不及格", "及格"]
+        for col_idx, desc in enumerate(descriptions):
+            cell = criteria_table.cell(1, col_idx)
+            cell.text = desc
+            self._set_cell_border(cell, top={'sz': 2}, left={'sz': 4}, bottom={'sz': 4}, right={'sz': 4})
+            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        doc.add_paragraph()
+    def _add_categories_details(self, doc: Document, loc_num: int) -> None:
+        """Add category details to Word document with total mark row"""
+        doc.add_heading('詳細評分', level=2)
+        
+        for category in self.categories:
+            if category == "其他" or category not in self.results["details"][loc_num]:
+                continue
+                
+            # Category heading
+            doc.add_heading(f'{category}', level=3)
+            
+            # Category description
+            desc_paragraph = doc.add_paragraph()
+            desc_run = desc_paragraph.add_run(f'{self.categories[category]["description"]}')
+            desc_run.italic = True
+            
+            # Details table
+            details = self.results["details"][loc_num][category]
+            if not details:
+                doc.add_paragraph("沒有可用的詳細數據")
+                doc.add_paragraph()
+                continue
+                
+            # Calculate total score for this category
+            total_score = sum(detail['score'] for detail in details if isinstance(detail['score'], (int, float)))
+                
+            # Create table
+            table = doc.add_table(rows=1, cols=2)
+            table.columns[0].width = Cm(10)
+            table.columns[1].width = Cm(2)
+            
+            # Header row
+            header_cells = table.rows[0].cells
+            header_cells[0].text = "問題"
+            header_cells[1].text = "得分"
+            for cell in header_cells:
+                cell.paragraphs[0].runs[0].bold = True
+                cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                self._set_cell_border(cell, top={'sz': 2}, left={'sz': 2}, bottom={'sz': 2}, right={'sz': 2})
+            
+            # Add data rows
+            for i, detail in enumerate(details):
+                row = table.add_row().cells
+                row[0].text = detail["question"]
+                row[1].text = f"{detail['score']:.2f}"
+                
+                # Format cells
+                for cell in row:
+                    self._set_cell_border(cell, top={'sz': 1}, left={'sz': 2}, bottom={'sz': 1}, right={'sz': 2})
+                    if i % 2 == 0:
+                        self._set_cell_background(cell, "f0f0f0")
+                
+                row[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Add total row with black background and white text
+            total_row = table.add_row().cells
+            total_row[0].text = "總分"
+            total_row[1].text = f"{total_score:.2f}"
+            
+            # Format total row
+            for cell in total_row:
+                self._set_cell_border(cell, top={'sz': 3}, left={'sz': 2}, bottom={'sz': 2}, right={'sz': 2})
+                self._set_cell_background(cell, "000000")  # Black background
+                self._set_text_color(cell, "FFFFFF")       # White text
+                cell.paragraphs[0].runs[0].bold = True
+                cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            doc.add_paragraph()
+    def _add_other_section(self, doc: Document, loc_num: int) -> None:
+        """Add 'other' section to Word document"""
+        other_data = self.results["other"].get(loc_num, [])
+        non_empty_data = [item for item in other_data if item.get("content", "").strip()]
+        
+        if not non_empty_data:
+            # Empty table if no data
+            other_table = doc.add_table(rows=1, cols=2)
+            other_table.columns[0].width = Cm(1)
+            other_table.columns[1].width = Cm(13)
+            other_table.cell(0, 0).text = ""
+            other_table.cell(0, 1).text = ""
+            
+            for col_idx in range(2):
+                cell = other_table.cell(0, col_idx)
+                self._set_cell_border(cell, top={'sz': 2}, left={'sz': 4}, bottom={'sz': 2}, right={'sz': 4})
+        else:
+            # Create table with data
+            other_table = doc.add_table(rows=len(non_empty_data), cols=2)
+            other_table.columns[0].width = Cm(1)
+            other_table.columns[1].width = Cm(13)
+            
+            for row_idx, item in enumerate(non_empty_data):
+                other_table.cell(row_idx, 0).text = str(item.get("index", row_idx + 1))
+                other_table.cell(row_idx, 1).text = str(item["content"])
+                
+                # Format cells
+                for col_idx in range(2):
+                    cell = other_table.cell(row_idx, col_idx)
+                    self._set_cell_border(cell, top={'sz': 2}, left={'sz': 4}, bottom={'sz': 2}, right={'sz': 4})
+                    if col_idx == 0:
+                        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        doc.add_paragraph()
+    def _add_improvement_section(self, doc: Document, loc_num: int) -> None:
+        """Add improvement measures section to Word document"""
+        doc.add_heading('改善措施', level=2)
+        
+        # Create table
+        table = doc.add_table(rows=4, cols=5)
+        table.autofit = False
+        table.columns[0].width = Cm(1.5)
+        table.columns[1].width = Cm(2)
+        table.columns[2].width = Cm(3)
+        table.columns[3].width = Cm(4)
+        table.columns[4].width = Cm(2.5)
+        
+        # Header row
+        headers = ["序號", "類型", "改善範圍", "行動計劃", "預計完成日期"]
+        for col_idx, header in enumerate(headers):
+            cell = table.cell(0, col_idx)
+            cell.text = header
+            cell.paragraphs[0].runs[0].bold = True
+            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            self._set_cell_border(cell, top={'sz': 4}, left={'sz': 4}, bottom={'sz': 4}, right={'sz': 4})
+            self._set_cell_background(cell, "000000")
+            self._set_text_color(cell, "FFFFFF")
+        
+        # Empty rows for user input
+        for idx in range(1, 4):
+            row = table.rows[idx]
+            row.cells[0].text = str(idx)
+            for col_idx in range(5):
+                row.cells[col_idx].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER if col_idx == 0 else WD_ALIGN_PARAGRAPH.LEFT
+                self._set_cell_border(row.cells[col_idx], top={'sz': 2}, left={'sz': 4}, bottom={'sz': 2}, right={'sz': 4})
+        
+        doc.add_paragraph()
+    def _format_header_cell(self, cell: _Cell) -> None:
+        """Format header cell in Word table"""
+        cell.paragraphs[0].runs[0].bold = True
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        self._set_cell_border(cell, top={'sz': 4}, left={'sz': 4}, bottom={'sz': 4}, right={'sz': 4})
+        self._set_cell_background(cell, "000000")
+        self._set_text_color(cell, "FFFFFF")
+    def _format_data_cell(self, cell: _Cell, is_header: bool = False) -> None:
+        """Format data cell in Word table"""
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        self._set_cell_border(cell, top={'sz': 2}, left={'sz': 4}, bottom={'sz': 2}, right={'sz': 4})
+        if is_header:
+            cell.paragraphs[0].runs[0].bold = True
+            self._set_cell_background(cell, "f0f0f0")
+    def _set_cell_border(self, cell: _Cell, **kwargs: Any) -> _Cell:
+        """Set cell borders in Word table"""
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        
+        border_map = {'top': 'top', 'left': 'left', 'bottom': 'bottom', 'right': 'right'}
+        
+        for edge, tag in border_map.items():
+            if edge in kwargs:
+                border = OxmlElement(f'w:{tag}')
+                border.set(qn('w:val'), 'single')
+                border.set(qn('w:sz'), str(kwargs[edge].get('sz', 4)))
+                border.set(qn('w:space'), '0')
+                border.set(qn('w:color'), kwargs[edge].get('color', 'auto'))
+                tcPr.append(border)
+        
+        return cell
+    def _set_cell_background(self, cell: _Cell, color_code: str) -> None:
+        """Set cell background color in Word table"""
+        tcPr = cell._tc.get_or_add_tcPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:fill"), color_code)
+        tcPr.append(shd)
+    def _set_text_color(self, cell: _Cell, color_code: str) -> None:
+        """Set text color in Word table cell"""
+        for paragraph in cell.paragraphs:
+            for run in paragraph.runs:
+                run.font.color.rgb = RGBColor.from_string(color_code)
+    def _pad_list(self, lst: List[Any], target_length: int, filler: Any) -> List[Any]:
+        """Pad list to target length with filler values"""
+        current_len = len(lst)
+        if current_len >= target_length:
+            return lst[:target_length]
+            
+        for i in range(current_len, target_length):
+            if isinstance(filler, str) and "{index}" in filler:
+                lst.append(filler.format(index=i+1))
+            else:
+                lst.append(filler)
+        return lst
+    def _clear_all_trees(self) -> None:
+        """Clear all treeview widgets"""
+        # Clear summary tree
+        for item in self.summary_tree.get_children():
+            self.summary_tree.delete(item)
+        
+        # Clear detail trees for each location and category
+        for loc_num in [1, 2, 3]:
+            # Clear category detail trees
+            for category in self.detail_trees[loc_num]:
+                tree = self.detail_trees[loc_num][category]
+                for item in tree.get_children():
+                    tree.delete(item)
+            
+            # Clear 'other' category trees
+            if self.other_trees[loc_num] is not None:
+                other_tree = self.other_trees[loc_num]
+                for item in other_tree.get_children():
+                    other_tree.delete(item)
+    def _show_temp_message(self, message: str, color: str = "black") -> None:
+        """Show a temporary message in the status bar"""
+        original_text = self.status_var.get()
+        self.status_var.set(message)
+        self.root.update()
+        
+        # Restore original text after 2 seconds
+        self.root.after(2000, lambda: self.status_var.set(original_text))
+    def _handle_interrupt(self, signal, frame) -> None:
+        """Handle keyboard interrupt (Ctrl+C)"""
+        if messagebox.askyesno("確認退出", "確定要退出程式嗎？"):
+            self.root.destroy()
+            exit(0)
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = SixSCalculator(root)
+    root.mainloop()
+
+
