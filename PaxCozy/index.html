@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cathay Pacific - Smart Luggage Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#005d63',
+                        secondary: '#b9a779',
+                        dark: '#014b59',
+                        allowed: '#10b981',
+                        restricted: '#f59e0b',
+                        prohibited: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .scan-animation {
+            animation: scan 2s ease-in-out infinite;
+        }
+        
+        @keyframes scan {
+            0%,
+            100% {
+                transform: translateY(0);
+                opacity: 0.7;
+            }
+            50% {
+                transform: translateY(20px);
+                opacity: 1;
+            }
+        }
+        
+        .pulse-ring {
+            animation: pulse 1.5s ease-out infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(0.8);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 font-sans min-h-screen">
+    <header class="bg-gradient-to-r from-primary to-dark text-white shadow-lg fixed top-0 left-0 right-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                    <i class="fa fa-plane text-lg"></i>
+                </div>
+                <h1 class="text-xl font-bold">Cathay Pacific Luggage Scanner</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="langSwitch" class="text-white hover:text-secondary transition-colors">
+                    <i class="fa fa-globe text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto pt-20 pb-24 px-4">
+        <section id="modeSelection" class="fade-in">
+            <div class="text-center my-8">
+                <h2 class="text-2xl font-bold text-dark mb-3">Luggage Item Safety Check</h2>
+                <p class="text-gray-600">Real-time detection of item compliance with aviation safety regulations</p>
+            </div>
+
+            <div class="max-w-md mx-auto mb-6 bg-white rounded-xl shadow-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-semibold text-dark flex items-center">
+                        <i class="fa fa-route text-primary mr-2"></i> Travel Route
+                    </h3>
+                    <div id="routeStatus" class="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full hidden">
+                        Set
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Departure</label>
+                            <select id="departureSelect" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <option value="">Select Departure</option>
+                                <option value="china_mainland">Mainland China</option>
+                                <option value="hong_kong">Hong Kong</option>
+                                <option value="usa">United States</option>
+                                <option value="europe">Europe</option>
+                                <option value="japan">Japan</option>
+                                <option value="singapore">Singapore</option>
+                                <option value="australia">Australia</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Destination</label>
+                            <select id="destinationSelect" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <option value="">Select Destination</option>
+                                <option value="china_mainland">Mainland China</option>
+                                <option value="hong_kong">Hong Kong</option>
+                                <option value="usa">United States</option>
+                                <option value="europe">Europe</option>
+                                <option value="japan">Japan</option>
+                                <option value="singapore">Singapore</option>
+                                <option value="australia">Australia</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-center text-gray-400">
+                        <i class="fa fa-exchange text-xs"></i>
+                    </div>
+
+                    <div id="currentRouteDisplay" class="text-center p-2 bg-primary/5 rounded-lg border border-primary/10">
+                        <span id="currentRouteText" class="text-sm font-medium text-primary">Please select departure and destination</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+                <div class="p-6">
+                    <div class="space-y-4">
+                        <button id="startCameraBtn" class="w-full p-4 bg-gradient-to-r from-primary to-dark text-white rounded-lg hover:opacity-90 transition-all transform hover:-translate-y-1 flex items-center justify-start">
+                            <i class="fa fa-camera text-2xl mr-4"></i>
+                            <div class="text-left">
+                                <h3 class="text-lg font-bold">Live Camera Detection</h3>
+                                <p class="text-sm opacity-90">Use camera to scan items</p>
+                            </div>
+                        </button>
+
+                        <!-- Modified section: Text input instead of photo upload -->
+                        <div class="w-full p-4 border-2 border-dashed border-primary text-primary rounded-lg hover:bg-primary/5 transition-all">
+                            <div class="flex items-center">
+                                <i class="fa fa-keyboard-o text-2xl mr-4"></i>
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-bold">Check by Item Name</h3>
+                                    <p class="text-sm mb-2">Type the item name for analysis</p>
+                                    <div class="flex">
+                                        <input type="text" id="itemNameInput" placeholder="Enter item name (e.g. 'perfume')" 
+                                            class="flex-1 p-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                        <button id="checkItemBtn" class="bg-primary text-white px-4 rounded-r-lg hover:bg-dark transition-colors">
+                                            <i class="fa fa-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-4 border-t border-gray-200">
+                        <h4 class="font-semibold mb-3 text-dark">Quick Check Common Items</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="quick-item-btn p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-sm" data-item="powerbank">
+                                <i class="fa fa-battery-full text-primary mr-1"></i> Power Bank
+                            </button>
+                            <button class="quick-item-btn p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-sm" data-item="laptop">
+                                <i class="fa fa-laptop text-primary mr-1"></i> Laptop
+                            </button>
+                            <button class="quick-item-btn p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-sm" data-item="liquids">
+                                <i class="fa fa-tint text-primary mr-1"></i> Liquids
+                            </button>
+                            <button class="quick-item-btn p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-sm" data-item="scissors">
+                                <i class="fa fa-cut text-primary mr-1"></i> Scissors
+                            </button>
+                            <button class="quick-item-btn p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-sm" data-item="spray">
+                                <i class="fa fa-spray-can text-primary mr-1"></i> Spray
+                            </button>
+                            <button class="quick-item-btn p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-sm" data-item="lighter">
+                                <i class="fa fa-fire text-primary mr-1"></i> Lighter
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-4 border-t border-gray-200">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="font-semibold text-dark">Recent Scan Records</h4>
+                            <button id="clearHistoryBtn" class="text-xs text-gray-500 hover:text-primary">
+                                Clear History
+                            </button>
+                        </div>
+                        <div id="recentScans" class="space-y-2 max-h-48 overflow-y-auto">
+                            <!-- Records will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="cameraInterface" class="hidden">
+            <div class="max-w-2xl mx-auto mb-4">
+                <div class="flex items-center justify-between bg-white rounded-lg shadow-sm p-3">
+                    <div class="flex items-center">
+                        <i class="fa fa-route text-primary mr-2"></i>
+                        <span id="cameraRouteInfo" class="text-sm font-medium"></span>
+                    </div>
+                    <button id="changeRouteCameraBtn" class="text-primary hover:text-dark text-sm">
+                        <i class="fa fa-edit mr-1"></i> Change Route
+                    </button>
+                </div>
+            </div>
+
+            <div class="relative bg-black rounded-xl overflow-hidden aspect-[4/3] max-w-2xl mx-auto shadow-2xl">
+                <video id="cameraFeed" autoplay playsinline class="w-full h-full object-cover"></video>
+                <canvas id="photoCanvas" class="hidden"></canvas>
+
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <div class="w-64 h-64 border-2 border-secondary rounded-lg relative">
+                        <div class="absolute top-0 left-0 right-0 h-1 bg-secondary scan-animation"></div>
+                        <div class="absolute top-1/2 left-0 right-0 text-center text-white">
+                            <div class="bg-black/60 px-3 py-1 rounded inline-block">
+                                Place item within frame to scan
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="detectionOverlay" class="hidden absolute top-4 left-4 bg-black/70 text-white p-3 rounded-lg max-w-xs">
+                    <div id="detectionResult" class="text-sm"></div>
+                </div>
+            </div>
+
+            <div class="flex justify-center space-x-8 mt-6">
+                <button id="backToMenuBtn" class="flex flex-col items-center text-gray-600 hover:text-primary transition-colors">
+                    <div class="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center mb-2">
+                        <i class="fa fa-arrow-left text-primary"></i>
+                    </div>
+                    <span class="text-sm font-medium">Back</span>
+                </button>
+
+                <button id="captureBtn" class="flex flex-col items-center text-white transition-all transform hover:scale-105">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-r from-primary to-dark flex items-center justify-center shadow-xl mb-2 relative">
+                        <div class="pulse-ring absolute inset-0 border-4 border-primary rounded-full"></div>
+                        <i class="fa fa-camera text-xl"></i>
+                    </div>
+                    <span class="text-sm font-medium">Scan Item</span>
+                </button>
+
+                <button id="toggleFlashBtn" class="flex flex-col items-center text-gray-600 hover:text-primary transition-colors">
+                    <div class="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center mb-2">
+                        <i class="fa fa-flash text-primary"></i>
+                    </div>
+                    <span class="text-sm font-medium">Flash</span>
+                </button>
+            </div>
+        </section>
+
+        <section id="resultInterface" class="hidden fade-in">
+            <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+                <div id="resultHeader" class="p-4 text-center text-white">
+                    <h2 class="text-xl font-bold flex items-center justify-center">
+                        <i id="resultIcon" class="fa mr-2"></i>
+                        <span id="resultTitle">Scan Result</span>
+                    </h2>
+                </div>
+
+                <div class="p-6">
+                    <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fa fa-route text-primary mr-2"></i>
+                                <span id="routeDisplay" class="font-medium text-sm"></span>
+                            </div>
+                            <button id="changeRouteResultBtn" class="text-primary hover:text-dark text-xs">
+                                <i class="fa fa-edit mr-1"></i> Change Route
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center mb-6">
+                        <div class="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+                            <img id="resultImage" src="" alt="Scanned item" class="w-full h-full object-cover">
+                        </div>
+                        <div class="ml-4 flex-1">
+                            <h3 id="itemName" class="text-lg font-bold text-dark">Detected Item</h3>
+                            <p id="itemDetails" class="text-gray-600 text-sm">Scan result details</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div id="statusCard" class="p-4 rounded-lg border">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="font-semibold flex items-center">
+                                    <i id="statusIcon" class="fa mr-2"></i>
+                                    <span id="statusText">Safety Status</span>
+                                </h4>
+                                <div id="statusBadge" class="px-2 py-1 rounded-full text-xs font-medium text-white">
+                                    Status
+                                </div>
+                            </div>
+                            <p id="statusDescription" class="text-sm">Status description</p>
+                        </div>
+
+                        <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <h4 class="font-semibold text-blue-800 flex items-center mb-2">
+                                <i class="fa fa-info-circle mr-2"></i> Detailed Regulations
+                            </h4>
+                            <p id="regulations" class="text-blue-700 text-sm">Related regulation details</p>
+                            <button id="viewDetailsBtn" class="mt-3 w-full py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium">
+                                <i class="fa fa-external-link mr-1"></i>
+                                View Full Safety Regulations
+                            </button>
+                        </div>
+
+                        <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 flex items-center mb-2">
+                                <i class="fa fa-lightbulb-o mr-2"></i> Travel Tips
+                            </h4>
+                            <p id="travelTips" class="text-gray-700 text-sm">Travel suggestions</p>
+                        </div>
+                    </div>
+
+                    <div class="flex space-x-3 mt-6">
+                        <button id="newScanBtn" class="flex-1 py-3 bg-primary text-white rounded-lg hover:bg-dark transition-colors font-medium">
+                            Scan New Item
+                        </button>
+                        <button id="saveResultBtn" class="flex-1 py-3 border border-primary text-primary rounded-lg hover:bg-primary/5 transition-colors font-medium">
+                            Save Result
+                        </button>
+                    </div>
+
+                    <div id="rescanNotice" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center hidden">
+                        <p class="text-yellow-700 text-sm">
+                            <i class="fa fa-exclamation-triangle mr-1"></i> Route changed, recommend rescanning for accurate results
+                        </p>
+                        <button id="rescanBtn" class="mt-2 w-full py-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition-colors text-sm font-medium">
+                            <i class="fa fa-refresh mr-1"></i>
+                            Rescan This Item
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Application State
+        const AppState = {
+            currentView: 'modeSelection',
+            cameraStream: null,
+            isFlashOn: false,
+            currentRoute: {
+                departure: '',
+                destination: ''
+            },
+            currentScan: null,
+            recentScans: []
+        };
+
+        // Item Database - ALL IN ENGLISH
+        const EnhancedItemDatabase = {
+            'powerbank': {
+                name: 'Power Bank',
+                images: {
+                    allowed: 'https://images.unsplash.com/1609592810794-3cbcb1e7ff0f?w=200&h=200&fit=crop'
+                },
+                regulations: {
+                    'china_mainland': {
+                        status: 'allowed',
+                        conditions: 'Capacity not exceeding 100Wh',
+                        details: 'Can be carried onboard, prohibited in checked baggage.',
+                        tips: 'Ensure the power bank is undamaged with clear capacity markings.'
+                    },
+                    'hong_kong': {
+                        status: 'allowed',
+                        conditions: 'Capacity not exceeding 100Wh',
+                        details: 'Can be carried onboard, prohibited in checked baggage.',
+                        tips: 'Ensure the power bank is undamaged with clear capacity markings.'
+                    },
+                    'usa': {
+                        status: 'allowed',
+                        conditions: 'Capacity not exceeding 100Wh',
+                        details: 'Must be carried onboard, prohibited in checked baggage.',
+                        tips: 'TSA requires power banks to be in carry-on luggage.'
+                    }
+                }
+            },
+            'laptop': {
+                name: 'Laptop Computer',
+                images: {
+                    allowed: 'https://images.unsplash.com/1496181133206-80ce9b88a853?w=200&h=200&fit=crop'
+                },
+                regulations: {
+                    'china_mainland': {
+                        status: 'allowed',
+                        conditions: 'No restrictions',
+                        details: 'Can be carried onboard, must be removed for screening.',
+                        tips: 'Keep in easily accessible bags.'
+                    },
+                    'hong_kong': {
+                        status: 'allowed',
+                        conditions: 'No restrictions',
+                        details: 'Can be carried onboard, must be removed for screening.',
+                        tips: 'Keep in easily accessible bags.'
+                    },
+                    'usa': {
+                        status: 'allowed',
+                        conditions: 'No restrictions',
+                        details: 'Can be carried onboard, requires separate screening.',
+                        tips: 'TSA PreCheck members may not need to remove laptops.'
+                    }
+                }
+            },
+            'liquids': {
+                name: 'Liquid Containers',
+                images: {
+                    restricted: 'https://images.unsplash.com/1558618047-3c8c76ca7d13?w=200&h=200&fit=crop'
+                },
+                regulations: {
+                    'china_mainland': {
+                        status: 'restricted',
+                        conditions: 'Individual containers not exceeding 100ml',
+                        details: 'Must be placed in transparent sealed bags.',
+                        tips: 'Cosmetics and beverages are subject to these restrictions.'
+                    },
+                    'hong_kong': {
+                        status: 'restricted',
+                        conditions: 'Individual containers not exceeding 100ml',
+                        details: 'Must be placed in transparent sealed bags.',
+                        tips: 'Cosmetics and beverages are subject to these restrictions.'
+                    },
+                    'usa': {
+                        status: 'restricted',
+                        conditions: '3-1-1 rule: 100ml maximum',
+                        details: 'Containers not exceeding 3.4 ounces in one quart-sized bag.',
+                        tips: 'TSA 3-1-1 rule applies to all liquids and gels.'
+                    }
+                }
+            },
+            'scissors': {
+                name: 'Scissors',
+                images: {
+                    restricted: 'https://images.unsplash.com/1589578527960-fc5c98dc57c6?w=200&h=200&fit=crop'
+                },
+                regulations: {
+                    'china_mainland': {
+                        status: 'restricted',
+                        conditions: 'Blade length not exceeding 6cm',
+                        details: 'Scissors with blades over 6cm must be checked.',
+                        tips: 'Small stationery scissors are usually allowed.'
+                    },
+                    'hong_kong': {
+                        status: 'restricted',
+                        conditions: 'Blade length not exceeding 6cm',
+                        details: 'Scissors with blades over 6cm must be checked.',
+                        tips: 'Small stationery scissors are usually allowed.'
+                    },
+                    'usa': {
+                        status: 'prohibited',
+                        conditions: 'Blades over 4 inches prohibited',
+                        details: 'TSA requires scissors with blades over 4 inches to be checked.',
+                        tips: 'Round-tipped children scissors usually unrestricted.'
+                    }
+                }
+            },
+            'lighter': {
+                name: 'Lighter',
+                images: {
+                    prohibited: 'https://images.unsplash.com/16010b6b5be37?w=200&h=200&fit=crop'
+                },
+                regulations: {
+                    'china_mainland': {
+                        status: 'prohibited',
+                        conditions: 'Completely prohibited',
+                        details: 'Lighters prohibited in carry-on and checked baggage.',
+                        tips: 'Airports provide lighter disposal bins.'
+                    },
+                    'hong_kong': {
+                        status: 'prohibited',
+                        conditions: 'Completely prohibited',
+                        details: 'Lighters prohibited in carry-on and checked baggage.',
+                        tips: 'Airports provide lighter disposal bins.'
+                    },
+                    'usa': {
+                        status: 'restricted',
+                        conditions: '1 disposable lighter allowed',
+                        details: 'Lighters prohibited in checked baggage.',
+                        tips: 'TSA regulations change frequently.'
+                    }
+                }
+            },
+            'spray': {
+                name: 'Spray Can',
+                images: {
+                    restricted: 'https://images.unsplash.com/1584305574647-469b2288dce4?w=200&h=200&fit=crop'
+                },
+                regulations: {
+                    'china_mainland': {
+                        status: 'restricted',
+                        conditions: 'Non-flammable types can be checked',
+                        details: 'Aerosols usually prohibited in carry-on.',
+                        tips: 'Consider travel-sized personal care products.'
+                    },
+                    'hong_kong': {
+                        status: 'restricted',
+                        conditions: 'Non-flammable types can be checked',
+                        details: 'Aerosols usually prohibited in carry-on.',
+                        tips: 'Consider travel-sized personal care products.'
+                    },
+                    'usa': {
+                        status: 'restricted',
+                        conditions: 'Subject to liquid restrictions',
+                        details: 'Spray products subject to 3-1-1 liquid rules.',
+                        tips: 'TSA has specific regulations for spray products.'
+                    }
+                }
+            },
+            // Additional items for better text search coverage
+            'perfume': {
+                name: 'Perfume',
+                images: {
+                    restricted: 'https://images.unsplash.com/1584305574647-469b2288dce4?w=200&h=200&fit=crop'
+                },
+                regulations: {
+                    'china_mainland': {
+                        status: 'restricted',
+                        conditions: 'Container not exceeding 100ml',
+                        details: 'Must be placed in transparent sealed bags in carry-on.',
+                        tips: 'Larger bottles must be placed in checked baggage.'
+                    },
+                    'hong_kong': {
+                        status: 'restricted',
+                        conditions: 'Container not exceeding 100ml',
+                        details: 'Must be placed in transparent sealed bags in carry-on.',
+                        tips: 'Larger bottles must be placed in checked baggage.'
+                    },
+                    'usa': {
+                        status: 'restricted',
+                        conditions: '3-1-1 rule applies',
+                        details: 'Containers not exceeding 3.4 ounces in one quart-sized bag.',
+                        tips: 'Larger bottles must go in checked luggage.'
+                    }
+                }
+            },
+            'knife': {
+                name: 'Knife',
+                images: {
+                    prohibited: 'https://images.unsplash.com/1589578527960-fc5c98dc57c6?w=200&h=200&fit=crop'
+                },
+                regulations: {
+                    'china_mainland': {
+                        status: 'prohibited',
+                        conditions: 'All sharp knives prohibited',
+                        details: 'Prohibited in carry-on baggage, must be checked.',
+                        tips: 'Even small pocket knives are not allowed in cabin baggage.'
+                    },
+                    'hong_kong': {
+                        status: 'prohibited',
+                        conditions: 'All sharp knives prohibited',
+                        details: 'Prohibited in carry-on baggage, must be checked.',
+                        tips: 'Even small pocket knives are not allowed in cabin baggage.'
+                    },
+                    'usa': {
+                        status: 'prohibited',
+                        conditions: 'All sharp knives prohibited',
+                        details: 'Prohibited in carry-on baggage, must be checked.',
+                        tips: 'TSA strictly enforces knife restrictions.'
+                    }
+                }
+            }
+        };
+
+        // Search aliases for text input matching
+        const ItemAliases = {
+            'phone charger': 'powerbank',
+            'mobile charger': 'powerbank',
+            'notebook': 'laptop',
+            'computer': 'laptop',
+            'water bottle': 'liquids',
+            'shampoo': 'liquids',
+            'conditioner': 'liquids',
+            'perfume': 'perfume',
+            'cologne': 'perfume',
+            'hair spray': 'spray',
+            'deodorant spray': 'spray',
+            'blade': 'knife',
+            'pocket knife': 'knife',
+            'nail scissors': 'scissors'
+        };
+
+        // Status Configuration
+        const StatusConfig = {
+            'allowed': {
+                color: '#10b981',
+                headerColor: 'bg-allowed',
+                text: 'Item Allowed',
+                icon: 'fa-check-circle',
+                badgeText: 'Allowed',
+                description: 'Complies with aviation safety regulations'
+            },
+            'restricted': {
+                color: '#f59e0b',
+                headerColor: 'bg-restricted',
+                text: 'Item Restricted',
+                icon: 'fa-exclamation-triangle',
+                badgeText: 'Restricted',
+                description: 'This item has carry-on restrictions'
+            },
+            'prohibited': {
+                color: '#ef4444',
+                headerColor: 'bg-prohibited',
+                text: 'Item Prohibited',
+                icon: 'fa-times-circle',
+                badgeText: 'Prohibited',
+                description: 'This item is prohibited'
+            }
+        };
+
+        // Region Names - ALL IN ENGLISH
+        const regionNames = {
+            'china_mainland': 'Mainland China',
+            'hong_kong': 'Hong Kong',
+            'usa': 'United States',
+            'europe': 'Europe',
+            'japan': 'Japan',
+            'singapore': 'Singapore',
+            'australia': 'Australia'
+        };
+
+        // DOM Elements
+        const elements = {
+            modeSelection: document.getElementById('modeSelection'),
+            cameraInterface: document.getElementById('cameraInterface'),
+            resultInterface: document.getElementById('resultInterface'),
+            departureSelect: document.getElementById('departureSelect'),
+            destinationSelect: document.getElementById('destinationSelect'),
+            currentRouteDisplay: document.getElementById('currentRouteDisplay'),
+            currentRouteText: document.getElementById('currentRouteText'),
+            routeStatus: document.getElementById('routeStatus'),
+            cameraRouteInfo: document.getElementById('cameraRouteInfo'),
+            changeRouteCameraBtn: document.getElementById('changeRouteCameraBtn'),
+            changeRouteResultBtn: document.getElementById('changeRouteResultBtn'),
+            cameraFeed: document.getElementById('cameraFeed'),
+            photoCanvas: document.getElementById('photoCanvas'),
+            startCameraBtn: document.getElementById('startCameraBtn'),
+            itemNameInput: document.getElementById('itemNameInput'),
+            checkItemBtn: document.getElementById('checkItemBtn'),
+            backToMenuBtn: document.getElementById('backToMenuBtn'),
+            captureBtn: document.getElementById('captureBtn'),
+            toggleFlashBtn: document.getElementById('toggleFlashBtn'),
+            newScanBtn: document.getElementById('newScanBtn'),
+            saveResultBtn: document.getElementById('saveResultBtn'),
+            recentScans: document.getElementById('recentScans'),
+            clearHistoryBtn: document.getElementById('clearHistoryBtn'),
+            resultHeader: document.getElementById('resultHeader'),
+            resultTitle: document.getElementById('resultTitle'),
+            resultIcon: document.getElementById('resultIcon'),
+            resultImage: document.getElementById('resultImage'),
+            itemName: document.getElementById('itemName'),
+            itemDetails: document.getElementById('itemDetails'),
+            statusCard: document.getElementById('statusCard'),
+            statusIcon: document.getElementById('statusIcon'),
+            statusText: document.getElementById('statusText'),
+            statusBadge: document.getElementById('statusBadge'),
+            statusDescription: document.getElementById('statusDescription'),
+            regulations: document.getElementById('regulations'),
+            travelTips: document.getElementById('travelTips'),
+            viewDetailsBtn: document.getElementById('viewDetailsBtn'),
+            rescanNotice: document.getElementById('rescanNotice'),
+            rescanBtn: document.getElementById('rescanBtn')
+        };
+
+        // Initialize Application
+        function initApp() {
+            // Clear any existing Chinese data from localStorage
+            localStorage.removeItem('recentScans');
+
+            // Set up initial scan records with the three items
+            const initialScans = [{
+                name: 'Lighter',
+                status: 'prohibited',
+                timestamp: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
+                route: 'Hong Kong → Mainland China',
+                id: Date.now() - 300000
+            }, {
+                name: 'Power Bank',
+                status: 'allowed',
+                timestamp: new Date(Date.now() - 600000).toISOString(), // 10 minutes ago
+                route: 'Hong Kong → Mainland China',
+                id: Date.now() - 600000
+            }, {
+                name: 'Liquid Containers',
+                status: 'restricted',
+                timestamp: new Date(Date.now() - 900000).toISOString(), // 15 minutes ago
+                route: 'Hong Kong → Mainland China',
+                id: Date.now() - 900000
+            }];
+
+            AppState.recentScans = initialScans;
+            localStorage.setItem('recentScans', JSON.stringify(initialScans));
+
+            setupEventListeners();
+            loadRecentScans();
+            checkRouteSelection();
+
+            const savedRoute = localStorage.getItem('currentRoute');
+            if (savedRoute) {
+                const route = JSON.parse(savedRoute);
+                AppState.currentRoute = route;
+                elements.departureSelect.value = route.departure;
+                elements.destinationSelect.value = route.destination;
+                updateRouteDisplay();
+            }
+        }
+
+        // Event Listeners
+        function setupEventListeners() {
+            elements.departureSelect.addEventListener('change', handleRouteChange);
+            elements.destinationSelect.addEventListener('change', handleRouteChange);
+
+            elements.changeRouteCameraBtn.addEventListener('click', showModeSelection);
+            elements.changeRouteResultBtn.addEventListener('click', showModeSelection);
+
+            elements.startCameraBtn.addEventListener('click', startCamera);
+            
+            // New text input functionality
+            elements.checkItemBtn.addEventListener('click', handleTextCheck);
+            elements.itemNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleTextCheck();
+            });
+
+            // Quick item buttons
+            document.querySelectorAll('.quick-item-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const itemType = e.currentTarget.getAttribute('data-item');
+                    quickItemCheck(itemType);
+                });
+            });
+
+            elements.backToMenuBtn.addEventListener('click', stopCamera);
+            elements.captureBtn.addEventListener('click', captureImage);
+            elements.toggleFlashBtn.addEventListener('click', toggleFlash);
+
+            elements.newScanBtn.addEventListener('click', showModeSelection);
+            elements.saveResultBtn.addEventListener('click', saveCurrentResult);
+            elements.viewDetailsBtn.addEventListener('click', showFullRegulations);
+            elements.rescanBtn.addEventListener('click', rescanCurrentItem);
+
+            elements.clearHistoryBtn.addEventListener('click', clearHistory);
+
+            document.getElementById('langSwitch').addEventListener('click', () => {
+                alert('English version only');
+            });
+        }
+
+        // New function to handle text input checks
+        function handleTextCheck() {
+            const inputText = elements.itemNameInput.value.trim().toLowerCase();
+            
+            if (!inputText) {
+                alert('Please enter an item name to check');
+                return;
+            }
+            
+            if (!AppState.currentRoute.departure || !AppState.currentRoute.destination) {
+                alert('Please set travel route first');
+                return;
+            }
+            
+            // Try to find matching item
+            let itemType = findMatchingItem(inputText);
+            
+            if (itemType) {
+                quickItemCheck(itemType);
+                elements.itemNameInput.value = ''; // Clear input
+            } else {
+                alert(`Sorry, we couldn't find information for "${inputText}". Please try another item name.`);
+            }
+        }
+
+        // Find matching item type from text input
+        function findMatchingItem(inputText) {
+            // Check exact matches first
+            for (const key in EnhancedItemDatabase) {
+                if (EnhancedItemDatabase[key].name.toLowerCase() === inputText) {
+                    return key;
+                }
+            }
+            
+            // Check aliases
+            for (const alias in ItemAliases) {
+                if (inputText.includes(alias) || alias.includes(inputText)) {
+                    return ItemAliases[alias];
+                }
+            }
+            
+            // Check partial matches in item names
+            for (const key in EnhancedItemDatabase) {
+                const itemName = EnhancedItemDatabase[key].name.toLowerCase();
+                if (itemName.includes(inputText) || inputText.includes(itemName)) {
+                    return key;
+                }
+            }
+            
+            return null;
+        }
+
+        // Route Management
+        function handleRouteChange() {
+            const departure = elements.departureSelect.value;
+            const destination = elements.destinationSelect.value;
+
+            if (departure && destination && departure !== destination) {
+                const newRoute = {
+                    departure: departure,
+                    destination: destination
+                };
+
+                AppState.currentRoute = newRoute;
+                localStorage.setItem('currentRoute', JSON.stringify(newRoute));
+                updateRouteDisplay();
+
+                if (AppState.currentScan && AppState.currentView === 'result') {
+                    elements.rescanNotice.classList.remove('hidden');
+                }
+            } else {
+                elements.currentRouteText.textContent = 'Please select departure and destination';
+                elements.currentRouteDisplay.className = 'text-center p-2 bg-primary/5 rounded-lg border border-primary/10';
+                elements.routeStatus.classList.add('hidden');
+            }
+        }
+
+        function checkRouteSelection() {
+            const departure = elements.departureSelect.value;
+            const destination = elements.destinationSelect.value;
+            const isValid = departure && destination && departure !== destination;
+
+            if (isValid) {
+                handleRouteChange();
+            }
+        }
+
+        function updateRouteDisplay() {
+            const depName = regionNames[AppState.currentRoute.departure];
+            const destName = regionNames[AppState.currentRoute.destination];
+            const routeText = `${depName} → ${destName}`;
+
+            elements.currentRouteText.textContent = routeText;
+            elements.currentRouteDisplay.className = 'text-center p-2 bg-green-50 rounded-lg border border-green-200';
+            elements.routeStatus.classList.remove('hidden');
+            elements.cameraRouteInfo.textContent = routeText;
+        }
+
+        // Quick Item Check
+        function quickItemCheck(itemType) {
+            if (!AppState.currentRoute.departure || !AppState.currentRoute.destination) {
+                alert('Please set travel route first');
+                return;
+            }
+
+            const itemData = EnhancedItemDatabase[itemType];
+            if (!itemData) return;
+
+            const regulation = getCurrentRegulation(itemData);
+
+            AppState.currentScan = {
+                itemType: itemType,
+                itemData: itemData,
+                regulation: regulation
+            };
+
+            showResultInterface();
+            updateEnhancedResultUI(itemData, regulation, itemType);
+            addToRecentScans(itemData, regulation);
+        }
+
+        function getCurrentRegulation(itemData) {
+            return itemData.regulations[AppState.currentRoute.departure] ||
+                itemData.regulations[AppState.currentRoute.destination] ||
+                itemData.regulations.china_mainland;
+        }
+
+        function updateEnhancedResultUI(itemData, regulation, itemType) {
+            const status = regulation.status;
+            const statusConfig = StatusConfig[status];
+
+            elements.resultHeader.className = `p-4 text-center text-white ${statusConfig.headerColor}`;
+            elements.resultIcon.className = `fa ${statusConfig.icon} mr-2`;
+            elements.resultTitle.textContent = statusConfig.text;
+
+            elements.itemName.textContent = itemData.name;
+            elements.itemDetails.textContent = regulation.conditions;
+
+            const statusColorClass = `bg-${status}/20 border-${status}/30 text-${status}-800`;
+            elements.statusCard.className = `p-4 rounded-lg border ${statusColorClass}`;
+
+            elements.statusIcon.className = `fa ${statusConfig.icon} mr-2`;
+            elements.statusText.textContent = statusConfig.text;
+            elements.statusBadge.className = `px-2 py-1 rounded-full text-xs font-medium text-white bg-${status}`;
+            elements.statusBadge.textContent = statusConfig.badgeText;
+            elements.statusDescription.textContent = statusConfig.description;
+
+            elements.regulations.textContent = regulation.details;
+            elements.travelTips.textContent = regulation.tips;
+
+            const imageKey = status === 'allowed' ? 'allowed' : 'restricted';
+            elements.resultImage.src = itemData.images[imageKey] || itemData.images.allowed || itemData.images.restricted;
+
+            const depName = regionNames[AppState.currentRoute.departure];
+            const destName = regionNames[AppState.currentRoute.destination];
+            elements.routeDisplay.textContent = `${depName} → ${destName}`;
+        }
+
+        // Recent Scans Management
+        function addToRecentScans(itemData, regulation) {
+            const scanRecord = {
+                name: itemData.name,
+                status: regulation.status,
+                timestamp: new Date().toISOString(),
+                route: `${regionNames[AppState.currentRoute.departure]} → ${regionNames[AppState.currentRoute.destination]}`,
+                id: Date.now()
+            };
+
+            AppState.recentScans.unshift(scanRecord);
+            if (AppState.recentScans.length > 5) {
+                AppState.recentScans = AppState.recentScans.slice(0, 5);
+            }
+
+            localStorage.setItem('recentScans', JSON.stringify(AppState.recentScans));
+            loadRecentScans();
+        }
+
+        function loadRecentScans() {
+            elements.recentScans.innerHTML = '';
+
+            if (AppState.recentScans.length === 0) {
+                elements.recentScans.innerHTML = `
+                    <div class="text-center text-gray-500 py-4 border border-dashed border-gray-300 rounded-lg">
+                        <i class="fa fa-history text-2xl mb-2"></i>
+                        <p>No scan records yet</p>
+                    </div>`;
+                return;
+            }
+
+            AppState.recentScans.forEach(scan => {
+                const statusConfig = StatusConfig[scan.status];
+                const scanElement = document.createElement('div');
+                scanElement.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors';
+                scanElement.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fa ${statusConfig.icon} mr-3" style="color: ${statusConfig.color}"></i>
+                        <div>
+                            <div class="font-medium text-sm">${scan.name}</div>
+                            <div class="text-xs text-gray-500">${scan.route}</div>
+                        </div>
+                    </div>
+                    <div class="text-xs font-medium px-2 py-1 rounded-full text-white" style="background-color: ${statusConfig.color}">
+                        ${statusConfig.badgeText}
+                    </div>
+                `;
+                elements.recentScans.appendChild(scanElement);
+            });
+        }
+
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear all scan records?')) {
+                AppState.recentScans = [];
+                localStorage.setItem('recentScans', JSON.stringify(AppState.recentScans));
+                loadRecentScans();
+            }
+        }
+
+        function rescanCurrentItem() {
+            if (AppState.currentScan) {
+                const newRegulation = getCurrentRegulation(AppState.currentScan.itemData);
+                AppState.currentScan.regulation = newRegulation;
+                updateEnhancedResultUI(AppState.currentScan.itemData, newRegulation, AppState.currentScan.itemType);
+                elements.rescanNotice.classList.add('hidden');
+                updateRecentScan(AppState.currentScan.itemData, newRegulation);
+            }
+        }
+
+        function updateRecentScan(itemData, regulation) {
+            if (AppState.recentScans.length > 0) {
+                AppState.recentScans[0] = {
+                    name: itemData.name,
+                    status: regulation.status,
+                    timestamp: new Date().toISOString(),
+                    route: `${regionNames[AppState.currentRoute.departure]} → ${regionNames[AppState.currentRoute.destination]}`,
+                    id: Date.now()
+                };
+                localStorage.setItem('recentScans', JSON.stringify(AppState.recentScans));
+                loadRecentScans();
+            }
+        }
+
+        function showFullRegulations() {
+            alert('Opening full safety regulations page...');
+        }
+
+        // Interface Navigation
+        function showModeSelection() {
+            hideAllInterfaces();
+            elements.modeSelection.classList.remove('hidden');
+            AppState.currentView = 'modeSelection';
+            stopCamera();
+        }
+
+        function showCameraInterface() {
+            if (!AppState.currentRoute.departure || !AppState.currentRoute.destination) {
+                alert('Please set travel route first');
+                return;
+            }
+            hideAllInterfaces();
+            elements.cameraInterface.classList.remove('hidden');
+            AppState.currentView = 'camera';
+        }
+
+        function showResultInterface() {
+            hideAllInterfaces();
+            elements.resultInterface.classList.remove('hidden');
+            AppState.currentView = 'result';
+        }
+
+        function hideAllInterfaces() {
+            elements.modeSelection.classList.add('hidden');
+            elements.cameraInterface.classList.add('hidden');
+            elements.resultInterface.classList.add('hidden');
+        }
+
+        // Camera Functions
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: {
+                            ideal: 1280
+                        },
+                        height: {
+                            ideal: 720
+                        }
+                    }
+                });
+
+                elements.cameraFeed.srcObject = stream;
+                AppState.cameraStream = stream;
+                showCameraInterface();
+                startRealTimeDetection();
+
+            } catch (error) {
+                alert('Cannot access camera. Please ensure camera permissions are granted.');
+            }
+        }
+
+        function captureImage() {
+            const context = elements.photoCanvas.getContext('2d');
+            elements.photoCanvas.width = elements.cameraFeed.videoWidth;
+            elements.photoCanvas.height = elements.cameraFeed.videoHeight;
+            context.drawImage(elements.cameraFeed, 0, 0);
+            simulateAIDetection();
+        }
+
+        function simulateAIDetection() {
+            showResultInterface();
+
+            setTimeout(() => {
+                const items = Object.keys(EnhancedItemDatabase);
+                const randomItem = items[Math.floor(Math.random() * items.length)];
+                const itemData = EnhancedItemDatabase[randomItem];
+                const regulation = getCurrentRegulation(itemData);
+
+                AppState.currentScan = {
+                    itemType: randomItem,
+                    itemData: itemData,
+                    regulation: regulation
+                };
+
+                updateEnhancedResultUI(itemData, regulation, randomItem);
+                addToRecentScans(itemData, regulation);
+
+            }, 1500);
+        }
+
+        // Utility Functions
+        function stopCamera() {
+            if (AppState.cameraStream) {
+                AppState.cameraStream.getTracks().forEach(track => track.stop());
+                AppState.cameraStream = null;
+            }
+        }
+
+        function toggleFlash() {
+            AppState.isFlashOn = !AppState.isFlashOn;
+            const flashIcon = elements.toggleFlashBtn.querySelector('i');
+            flashIcon.className = AppState.isFlashOn ? 'fa fa-flash text-yellow-400' : 'fa fa-flash text-primary';
+        }
+
+        function saveCurrentResult() {
+            alert('Scan result saved to local records');
+        }
+
+        function startRealTimeDetection() {
+            setInterval(() => {
+                if (AppState.currentView === 'camera') {
+                    const items = ['Power Bank', 'Laptop Computer', 'Liquid Containers'];
+                    const randomItem = items[Math.floor(Math.random() * items.length)];
+                    elements.detectionResult.innerHTML = `
+                        <div class="font-semibold">Detected: ${randomItem}</div>
+                        <div class="text-green-400">✓ Safe to carry</div>
+                    `;
+                    elements.detectionOverlay.classList.remove('hidden');
+                }
+            }, 3000);
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+
+</html>
+
+
