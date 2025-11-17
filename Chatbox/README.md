@@ -29,3 +29,4 @@ A Java-based chat application with a server-client architecture and a WeChat-ins
 - **Java Development Kit (JDK)**: Version 8 or higher.
 - **IDE**: Optional (e.g., IntelliJ IDEA, Eclipse, or VS Code with Java support) for easier development.
 - A computer with network capabilities (for server-client communication).
+- Server host should be input , do not provide it the code.
