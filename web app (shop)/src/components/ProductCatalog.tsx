@@ -1,45 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { getAllItems, Item } from '../core'; // 从 core.ts 导入所有商品数据和 Item 类型定义
-import ProductItem from './ProductItem'; // 商品单项展示组件
+import { getAllItems, Item } from '../core';
+import ProductItem from './ProductItem';
 
-/**
- * 商品目录组件
- * 负责加载并展示所有商品列表
- * 使用 useEffect 在组件挂载时一次性获取商品数据
- */
+// 商品目录主组件 - 负责加载并展示所有商品
 const ProductCatalog: React.FC = () => {
-  // 状态：存储商品列表，使用只读数组类型确保数据不被意外修改
-  // 初始化为空数组
+  // 存储所有商品数据，使用 readonly 防止意外修改
   const [products, setProducts] = useState<readonly Item[]>([]);
 
-  /**
-   * 副作用钩子：组件首次渲染后执行
-   * 用于从 core.ts 中获取所有商品数据并更新状态
-   * 依赖数组为空 []，表示只在组件挂载时执行一次
-   */
+  // 组件挂载后只执行一次：加载静态商品数据
   useEffect(() => {
-    // 调用核心模块的函数获取所有商品数据（假设是同步的静态数据）
-    // 如果未来改为异步 API 请求，这里可以改成 async/await + try-catch
+    // getAllItems() 是同步函数，直接获取核心数据
+    // 如后续改为接口请求，可在此处改为 async/await + loading/error 状态
     const items = getAllItems();
     setProducts(items);
-  }, []); // 空依赖：仅在组件 mount 时运行
+  }, []); // 空依赖数组 → 只在组件 mount 时运行一次
 
   return (
     <div className="product-catalog-container">
-      {/* 页面标题 */}
-      <h2>📦 商品目录</h2>
+      {/* 页面主标题 */}
+      <h2>Product Catalog</h2>
 
-      {/* 商品网格或列表容器 */}
+      {/* 商品列表容器（支持 CSS Grid 或 Flex 布局） */}
       <div className="product-list">
-        {/* 遍历商品数组，为每个商品渲染 ProductItem 组件 */}
+        {/* 遍历商品数组，渲染每个商品卡片 */}
         {products.map((product) => (
-          // key 使用商品的唯一 id，确保 React 高效更新列表
+          // key 使用唯一 id，保证列表高效更新和正确复用组件
           <ProductItem key={product.id} product={product} />
         ))}
       </div>
 
-      {/* 可选：空状态处理（当前数据固定有值时可不加） */}
-      {/* {products.length === 0 && <p>暂无商品</p>} */}
+      {/* 可选：空数据占位（当前数据固定存在，可保留备用） */}
+      {/* {products.length === 0 && <p>No products available.</p>} */}
     </div>
   );
 };
